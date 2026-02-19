@@ -13,5 +13,18 @@
   },
   "dependencies": {
     "three": "^0.183.0"
-  }
+  },
+  "description": "",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/maria-campo-martins/lighthouse-keeper.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/maria-campo-martins/lighthouse-keeper/issues"
+  },
+  "homepage": "https://github.com/maria-campo-martins/lighthouse-keeper#readme"
 }
