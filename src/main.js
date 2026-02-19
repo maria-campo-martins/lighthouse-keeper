@@ -1,4 +1,6 @@
 import * as THREE from "three";
+import { createShipSystem } from "./ships.js";
+import { createRockSystem } from "./rocks.js";
 
 // -----------------------------------------------------------------------------
 // Constants: night scene and day/night transition
@@ -9,46 +11,57 @@ const CONFIG = {
   cameraFov: 60,
   cameraNear: 0.1,
   cameraFar: 2000,
+  cameraPosY: 80,
+  cameraPosZ: 120,
+  cameraLookZ: 300,
 
   // Ocean plane (world space: horizon in front of the keeper)
   oceanSize: 1200,
   oceanSegments: 32,
 
   // Night atmosphere — visible dark blues so horizon is clear from the start
-  // Sky = slightly lighter (top), ocean = darker (bottom) → clear horizon line
   ambientIntensity: 0.15,
   ambientColor: 0x1a1a2e,
-  skyColorNight: 0x0a1428,   // dark blue (top)
-  oceanColorNight: 0x030a17,  // darker blue (bottom)
+  skyColorNight: 0x0a1428,
+  oceanColorNight: 0x030a17,
   fogNear: 400,
   fogFar: 1200,
   fogColorNight: 0x080c18,
 
-  // Dawn (end of 30s transition)
+  // Dawn
   skyColorDawn: 0x87ceeb,
   oceanColorDawn: 0x0d4d87,
   fogColorDawn: 0x87ceeb,
 
-  // Transition duration (seconds) — stays dark longer, then fades to dawn
-  nightDuration: 90,
-
-  // Lighthouse beam (flashlight: apex at lamp, cone extends outward)
+  // Lighthouse beam
   beamLength: 800,
-  beamRadius: 50,       // radius of illuminated circle at horizon
+  beamRadius: 50,
   beamSegments: 24,
   beamColor: 0xffffaa,
   beamOpacity: 0.35,
   beamRotationSpeed: 0.02,
-  // Lamp position: bottom center of screen (in front of viewer, at horizon level)
-  lampOffsetX: 0,
-  lampOffsetY: -1.5,    // below camera eye level
-  lampOffsetZ: 3,      // in front of viewer
+  lampOffsetX: -0.001,
+  lampOffsetY: -0.1,
+  lampOffsetZ: 0,
+
+  // One full loop duration (seconds) — ships + sunrise synced to this
+  cycleDuration: 120,
+  cycleShipCount: 3,
+  cycleSpawnStart: 0.0,
+  cycleSpawnEnd: 30.0,
+
+  // Ship path (used to compute deterministic speed)
+  shipSpawnZ: 550,
+  shipArriveZ: 30,
+  shipLaneX: [-80, 0, 80],
+  shipY: 0.6,
 };
 
 // -----------------------------------------------------------------------------
 // Scene, camera, renderer
 // -----------------------------------------------------------------------------
 const scene = new THREE.Scene();
+const clock = new THREE.Clock();
 
 const camera = new THREE.PerspectiveCamera(
   CONFIG.cameraFov,
@@ -56,8 +69,8 @@ const camera = new THREE.PerspectiveCamera(
   CONFIG.cameraNear,
   CONFIG.cameraFar
 );
-camera.position.set(0, CONFIG.cameraHeight, 0);
-camera.lookAt(0, 0, 1000);
+camera.position.set(0, CONFIG.cameraPosY, CONFIG.cameraPosZ);
+camera.lookAt(0, 0, CONFIG.cameraLookZ);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -76,7 +89,7 @@ const _fogColor = new THREE.Color();
 // -----------------------------------------------------------------------------
 let oceanMaterial;
 let fogRef;
-let beamGroup;   // contains cone; positioned at lamp, rotated by user input
+let beamGroup;
 let beamMesh;
 let beamLight;
 
@@ -84,35 +97,25 @@ let beamLight;
 // Night environment: sky, ocean, fog, lighting
 // -----------------------------------------------------------------------------
 function setupScene() {
-  // Sky: background (top of screen) — starts dark blue, lightens at dawn
   scene.background = new THREE.Color(CONFIG.skyColorNight);
 
-  // Fog: interpolates with time
   fogRef = new THREE.Fog(CONFIG.fogColorNight, CONFIG.fogNear, CONFIG.fogFar);
   scene.fog = fogRef;
 
-  // Ocean: large XZ plane at y = 0 (bottom of view = horizon)
   const oceanGeometry = new THREE.PlaneGeometry(
     CONFIG.oceanSize,
     CONFIG.oceanSize,
     CONFIG.oceanSegments,
     CONFIG.oceanSegments
   );
-  // Use MeshBasicMaterial so ocean color is visible without lighting
-  // This ensures the ocean transitions properly and is always visible
-  oceanMaterial = new THREE.MeshBasicMaterial({
-    color: CONFIG.oceanColorNight,
-  });
+  oceanMaterial = new THREE.MeshBasicMaterial({ color: CONFIG.oceanColorNight });
   const ocean = new THREE.Mesh(oceanGeometry, oceanMaterial);
   ocean.rotation.x = -Math.PI / 2;
   ocean.position.y = 0;
   scene.add(ocean);
 
-  // Dim ambient; beam will provide main light later
   scene.add(new THREE.AmbientLight(CONFIG.ambientColor, CONFIG.ambientIntensity));
 
-  // Lighthouse beam: cone like a flashlight — apex at lamp, base = illuminated circle
-  // ConeGeometry: apex at +Y, base at -Y. We rotate so apex at origin, base extends in +Z.
   const beamGeometry = new THREE.ConeGeometry(
     CONFIG.beamRadius,
     CONFIG.beamLength,
@@ -126,24 +129,20 @@ function setupScene() {
     opacity: CONFIG.beamOpacity,
     side: THREE.DoubleSide,
   });
+
   beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
-  // Cone apex at +Y, base at -Y. Rotate so apex at origin, base in +Z.
   beamMesh.rotation.x = -Math.PI / 2;
-  // Shift so apex (was at +height/2) is at group origin
   beamMesh.position.z = CONFIG.beamLength / 2;
 
   beamGroup = new THREE.Group();
-  // Lamp in world space: in front of camera, at bottom center of view
-  // Camera at (0, cameraHeight, 0); lamp below and in front
   beamGroup.position.set(
-    CONFIG.lampOffsetX,
-    CONFIG.cameraHeight + CONFIG.lampOffsetY,
-    CONFIG.lampOffsetZ
+    camera.position.x + CONFIG.lampOffsetX,
+    camera.position.y + CONFIG.lampOffsetY,
+    camera.position.z + CONFIG.lampOffsetZ
   );
   beamGroup.add(beamMesh);
   scene.add(beamGroup);
 
-  // Spotlight to illuminate the ocean where beam hits
   beamLight = new THREE.SpotLight(CONFIG.beamColor, 2, CONFIG.beamLength, Math.PI / 6, 0.3);
   beamLight.position.set(0, 0, 0);
   beamLight.target.position.set(0, 0, CONFIG.beamLength);
@@ -154,24 +153,53 @@ function setupScene() {
 setupScene();
 
 // -----------------------------------------------------------------------------
-// Day/night transition: drive by real time, not frame count
+// Ships: deterministic speed + spawn interval derived from cycle config
 // -----------------------------------------------------------------------------
-let startTime = null;
+const shipDistance = CONFIG.shipSpawnZ - CONFIG.shipArriveZ;
+const shipSpeed = shipDistance / CONFIG.cycleDuration; // <-- no randomness
 
-function getDawnProgress() {
-  if (startTime === null) startTime = performance.now();
-  const elapsed = (performance.now() - startTime) / 1000; // seconds
-  return Math.min(elapsed / CONFIG.nightDuration, 1);
+const spawnWindow = Math.max(0, CONFIG.cycleSpawnEnd - CONFIG.cycleSpawnStart);
+const spawnInterval =
+  CONFIG.cycleShipCount <= 1 ? CONFIG.cycleDuration : spawnWindow / (CONFIG.cycleShipCount - 1);
+
+let shipSystem = createShipSystem(scene, {
+  shipCount: CONFIG.cycleShipCount,
+  shipSpawnZ: CONFIG.shipSpawnZ,
+  shipArriveZ: CONFIG.shipArriveZ,
+  shipLaneX: CONFIG.shipLaneX,
+  shipY: CONFIG.shipY,
+
+  // Keep your ships.js API the same, but remove randomness by setting min=max
+  shipSpeedMin: shipSpeed,
+  shipSpeedMax: shipSpeed,
+
+  // Spawns evenly across [cycleSpawnStart, cycleSpawnEnd]
+  shipSpawnInterval: spawnInterval,
+});
+
+const rockSystem = createRockSystem(scene, {
+  count: 10,
+  xMin: -140,
+  xMax: 140,
+  zMin: 150,
+  zMax: 520,
+  oceanY: 0,
+  minSpacing: 25,
+});
+
+
+// -----------------------------------------------------------------------------
+// Day/night transition: looped progress
+// -----------------------------------------------------------------------------
+function getCycleProgress(time) {
+  const tCycle = time % CONFIG.cycleDuration;
+  return tCycle / CONFIG.cycleDuration; // 0..1
 }
 
 function applyDawnTransition(progress) {
-  if (progress <= 0) return;
-
-  // Beam stays visible for entire night-to-dawn; boost opacity at dawn so it remains visible against lighter sky
   const beamOpacity = 0.35 + 0.25 * progress;
   beamMesh.material.opacity = Math.min(beamOpacity, 0.6);
 
-  // Lerp sky (background) — instance method, not static
   _skyColor.lerpColors(
     new THREE.Color(CONFIG.skyColorNight),
     new THREE.Color(CONFIG.skyColorDawn),
@@ -179,7 +207,6 @@ function applyDawnTransition(progress) {
   );
   scene.background.copy(_skyColor);
 
-  // Lerp ocean material color
   _oceanColor.lerpColors(
     new THREE.Color(CONFIG.oceanColorNight),
     new THREE.Color(CONFIG.oceanColorDawn),
@@ -187,7 +214,6 @@ function applyDawnTransition(progress) {
   );
   oceanMaterial.color.copy(_oceanColor);
 
-  // Lerp fog color so distant ocean blends with sky
   _fogColor.lerpColors(
     new THREE.Color(CONFIG.fogColorNight),
     new THREE.Color(CONFIG.fogColorDawn),
@@ -197,93 +223,35 @@ function applyDawnTransition(progress) {
 }
 
 // -----------------------------------------------------------------------------
-// Lighthouse beam control state
+// Beam control state + input
 // -----------------------------------------------------------------------------
-const beamRotation = {
-  yaw: 0,   // left/right rotation (around Y axis)
-  pitch: 0, // up/down rotation (around X axis)
-};
+const beamRotation = { yaw: 0, pitch: 0 };
+const keysPressed = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
 
-const keysPressed = {
-  ArrowLeft: false,
-  ArrowRight: false,
-  ArrowUp: false,
-  ArrowDown: false,
-};
-
-// -----------------------------------------------------------------------------
-// Keyboard input handling
-// -----------------------------------------------------------------------------
 function onKeyDown(event) {
-  switch (event.key) {
-    case "ArrowLeft":
-      keysPressed.ArrowLeft = true;
-      event.preventDefault();
-      break;
-    case "ArrowRight":
-      keysPressed.ArrowRight = true;
-      event.preventDefault();
-      break;
-    case "ArrowUp":
-      keysPressed.ArrowUp = true;
-      event.preventDefault();
-      break;
-    case "ArrowDown":
-      keysPressed.ArrowDown = true;
-      event.preventDefault();
-      break;
+  if (event.key in keysPressed) {
+    keysPressed[event.key] = true;
+    event.preventDefault();
   }
 }
-
 function onKeyUp(event) {
-  switch (event.key) {
-    case "ArrowLeft":
-      keysPressed.ArrowLeft = false;
-      event.preventDefault();
-      break;
-    case "ArrowRight":
-      keysPressed.ArrowRight = false;
-      event.preventDefault();
-      break;
-    case "ArrowUp":
-      keysPressed.ArrowUp = false;
-      event.preventDefault();
-      break;
-    case "ArrowDown":
-      keysPressed.ArrowDown = false;
-      event.preventDefault();
-      break;
+  if (event.key in keysPressed) {
+    keysPressed[event.key] = false;
+    event.preventDefault();
   }
 }
-
 window.addEventListener("keydown", onKeyDown);
 window.addEventListener("keyup", onKeyUp);
 
-// -----------------------------------------------------------------------------
-// Update beam rotation based on keyboard input
-// -----------------------------------------------------------------------------
 function updateBeamRotation() {
-  // Left/Right: rotate around Y axis (yaw)
-  if (keysPressed.ArrowLeft) {
-    beamRotation.yaw += CONFIG.beamRotationSpeed;
-  }
-  if (keysPressed.ArrowRight) {
-    beamRotation.yaw -= CONFIG.beamRotationSpeed;
-  }
+  if (keysPressed.ArrowLeft) beamRotation.yaw += CONFIG.beamRotationSpeed;
+  if (keysPressed.ArrowRight) beamRotation.yaw -= CONFIG.beamRotationSpeed;
 
-  // Up/Down: rotate around X axis (pitch)
-  // Limit pitch to prevent beam from pointing too far up or down
-  const maxPitch = Math.PI / 3; // 60 degrees
-  if (keysPressed.ArrowUp && beamRotation.pitch < maxPitch) {
-    beamRotation.pitch += CONFIG.beamRotationSpeed;
-  }
-  if (keysPressed.ArrowDown && beamRotation.pitch > -maxPitch) {
-    beamRotation.pitch -= CONFIG.beamRotationSpeed;
-  }
+  const maxPitch = Math.PI / 3;
+  if (keysPressed.ArrowUp && beamRotation.pitch < maxPitch) beamRotation.pitch -= CONFIG.beamRotationSpeed;
+  if (keysPressed.ArrowDown && beamRotation.pitch > -maxPitch) beamRotation.pitch += CONFIG.beamRotationSpeed;
 
-  // Apply yaw (left/right) and pitch (up/down) to beam group
-  // Beam points along +Z by default; rotations aim it like a flashlight
-  beamGroup.rotation.order = "YXZ"; // yaw first, then pitch
+  beamGroup.rotation.order = "YXZ";
   beamGroup.rotation.y = beamRotation.yaw;
   beamGroup.rotation.x = beamRotation.pitch;
 }
@@ -298,12 +266,34 @@ window.addEventListener("resize", () => {
 });
 
 // -----------------------------------------------------------------------------
-// Render loop
+// Loop reset (repeat cycle): reset ships at cycle boundary
+// NOTE: this expects ships.js to provide shipSystem.reset().
+// If you don't have it yet, add a reset() in ships.js that:
+// - removes ship meshes from scene
+// - clears internal arrays + counters (shipsSpawned/spawnTimer)
 // -----------------------------------------------------------------------------
+let lastCycleIndex = -1;
+
 function animate() {
-  const progress = getDawnProgress();
+  const dt = Math.min(clock.getDelta(), 0.033);
+  const time = clock.elapsedTime;
+
+  const cycleIndex = Math.floor(time / CONFIG.cycleDuration);
+  if (cycleIndex !== lastCycleIndex) {
+    lastCycleIndex = cycleIndex;
+    shipSystem.reset();
+  }
+
+  const progress = getCycleProgress(time);
   applyDawnTransition(progress);
   updateBeamRotation();
+
+  const hits = rockSystem.checkShipCollisions(shipSystem.ships);
+  if (hits.length > 0) {
+   
+  }
+
+  shipSystem.update(dt, time);
 
   requestAnimationFrame(animate);
   renderer.render(scene, camera);
