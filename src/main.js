@@ -22,6 +22,8 @@ const camera = new THREE.PerspectiveCamera(
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows for better quality
 document.body.appendChild(renderer.domElement);
 
 // Environments
@@ -35,8 +37,15 @@ playEnv.setActive(false);
 scene.updateMatrixWorld(true);
 
 // Compute intro pose ONCE
-const introStartPos = new THREE.Vector3(0, introEnv.plateauTopY + 70, 200);
-const introStartLook = introEnv.lighthouse.getAimPoint();
+// Start: Camera far back, looking at lighthouse in front
+const lighthouseCenter = introEnv.lighthouse.getAimPoint();
+const lighthouseTop = introEnv.lighthouse.getTopPosition();
+const introStartPos = new THREE.Vector3(0, lighthouseCenter.y + 20, 350);
+const introStartLook = lighthouseCenter.clone();
+
+// End: Camera zooms into the top of the lighthouse
+const introEndPos = new THREE.Vector3(0, lighthouseTop.y - 5, 60);
+const introEndLook = lighthouseTop.clone();
 
 // Force camera into intro pose right now (so frame 1 is correct)
 camera.position.copy(introStartPos);
@@ -51,8 +60,8 @@ const intro = createIntroCamera(camera, {
   duration: 6,
   startPos: introStartPos.clone(),
   startLook: introStartLook.clone(),
-  endPos: new THREE.Vector3(0, CONFIG.cameraPosY, CONFIG.cameraPosZ),
-  endLook: new THREE.Vector3(0, 0, CONFIG.cameraLookZ),
+  endPos: introEndPos.clone(),
+  endLook: introEndLook.clone(),
 });
 
 // Gameplay systems created on transition
@@ -79,6 +88,8 @@ function startPlay(timeNow) {
     shipSpawnZ: CONFIG.shipSpawnZ,
     shipArriveZ: CONFIG.shipArriveZ,
     shipLaneX: CONFIG.shipLaneX,
+    shipSpawnXMin: CONFIG.shipSpawnXMin,
+    shipSpawnXMax: CONFIG.shipSpawnXMax,
     shipY: CONFIG.shipY,
     shipSpeedMin: shipSpeed,
     shipSpeedMax: shipSpeed,
@@ -104,6 +115,7 @@ function startPlay(timeNow) {
 }
 
 let mode = MODE.INTRO;
+let introStartTime = null;
 
 window.addEventListener("resize", () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -117,10 +129,15 @@ function animate() {
 
   try {
     if (mode === MODE.INTRO) {
-      if (Math.floor(time) === 1) {
-          console.log("cam pos", camera.position.toArray(), "aim", introStartLook.toArray());
-        }
+      if (introStartTime === null) {
+        introStartTime = time;
+      }
+      
       const finished = intro.update(time);
+      
+      // Update sunset animation (sun setting)
+      const introProgress = Math.min(1.0, (time - introStartTime) / 6.0);
+      introEnv.updateSunset(introProgress);
 
       // Night moonlight look (introEnv already set background/fog/lights)
       // If your playEnv also has applyDawn, DON'T call it here.

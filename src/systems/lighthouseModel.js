@@ -52,7 +52,7 @@ export function createLighthouse(renderer, CONFIG = {}) {
   ring.position.y = towerHeight + ringHeight / 2;
   group.add(ring);
 
-  // Lantern room
+  // Lantern room (translucent window-like)
   const lanternHeight = 12;
   const lantern = new THREE.Mesh(
     new THREE.CylinderGeometry(10, 12, lanternHeight, 48),
@@ -60,10 +60,43 @@ export function createLighthouse(renderer, CONFIG = {}) {
       color: 0xf2f2f2,
       roughness: 0.4,
       metalness: 0.05,
+      transparent: true,
+      opacity: 0.3,
+      side: THREE.DoubleSide, // Visible from both inside and outside
     })
   );
   lantern.position.y = towerHeight + ringHeight + lanternHeight / 2;
   group.add(lantern);
+
+  // Person silhouette in lantern room (back view)
+  const personGroup = new THREE.Group();
+  const personY = towerHeight + ringHeight;
+  
+  // Head
+  const head = new THREE.Mesh(
+    new THREE.SphereGeometry(1.2, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
+  );
+  head.position.set(0, personY + 3.5, -8); // Positioned near back of lantern room
+  personGroup.add(head);
+  
+  // Torso
+  const torso = new THREE.Mesh(
+    new THREE.BoxGeometry(2.5, 3.5, 1.2),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
+  );
+  torso.position.set(0, personY + 1.2, -8);
+  personGroup.add(torso);
+  
+  // Shoulders/upper back
+  const shoulders = new THREE.Mesh(
+    new THREE.BoxGeometry(3.5, 1.2, 1.0),
+    new THREE.MeshStandardMaterial({ color: 0x2a2a2a })
+  );
+  shoulders.position.set(0, personY + 2.8, -8);
+  personGroup.add(shoulders);
+  
+  group.add(personGroup);
 
   // Red roof
   const roofHeight = 14;
@@ -92,9 +125,19 @@ export function createLighthouse(renderer, CONFIG = {}) {
     return lanternWorld;
   }
 
+  // Top of lighthouse (roof tip) position in world space
+  function getTopPosition() {
+    const topPos = new THREE.Vector3();
+    group.getWorldPosition(topPos);
+    const totalHeight = towerHeight + ringHeight + lanternHeight + roofHeight;
+    topPos.y += totalHeight;
+    return topPos;
+  }
+
   return {
     group,
     getAimPoint,
     getLanternWorldPosition,
+    getTopPosition,
   };
 }

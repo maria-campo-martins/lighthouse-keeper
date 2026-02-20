@@ -41,14 +41,16 @@ export const CONFIG = {
 
   // One full loop duration (seconds) — ships + sunrise synced to this
   cycleDuration: 120,
-  cycleShipCount: 3,
+  cycleShipCount: 5,
   cycleSpawnStart: 0.0,
-  cycleSpawnEnd: 30.0,
+  cycleSpawnEnd: 15.0,
 
   // Ship path (used to compute deterministic speed)
   shipSpawnZ: 550,
   shipArriveZ: 30,
-  shipLaneX: [-80, 0, 80],
+  shipLaneX: [-80, 0, 80], // Deprecated - kept for compatibility
+  shipSpawnXMin: -120,
+  shipSpawnXMax: 120,
   shipY: 0.6,
 };
 

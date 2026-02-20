@@ -26,7 +26,9 @@ export function createShipSystem(scene, {
   shipCount = 3,
   shipSpawnZ = 550,
   shipArriveZ = 30,
-  shipLaneX = [-80, 0, 80],
+  shipLaneX = [-80, 0, 80], // Deprecated - use shipSpawnXMin/Max instead
+  shipSpawnXMin = -120,
+  shipSpawnXMax = 120,
   shipY = 0.6,
   shipSpeedMin = 30,
   shipSpeedMax = 55,
@@ -34,15 +36,17 @@ export function createShipSystem(scene, {
 } = {}) {
   const ships = [];
   let shipsSpawned = 0;
-  let spawnTimer = 0;
+  // Initialize spawnTimer to spawnInterval so first ship spawns immediately
+  let spawnTimer = shipSpawnInterval;
 
   function spawnShip() {
     if (shipsSpawned >= shipCount) return;
 
     const mesh = makeShipMesh();
-    const laneIndex = shipsSpawned % shipLaneX.length;
+    // Spawn at random X position within screen bounds
+    const randomX = THREE.MathUtils.randFloat(shipSpawnXMin, shipSpawnXMax);
 
-    mesh.position.set(shipLaneX[laneIndex], shipY, shipSpawnZ);
+    mesh.position.set(randomX, shipY, shipSpawnZ);
     mesh.rotation.y = Math.PI; // face toward -Z (toward shore)
 
     const speed = THREE.MathUtils.randFloat(shipSpeedMin, shipSpeedMax);
@@ -84,7 +88,7 @@ export function createShipSystem(scene, {
   for (const s of ships) scene.remove(s.mesh);
   ships.length = 0;
   shipsSpawned = 0;
-  spawnTimer = 0;
+  spawnTimer = shipSpawnInterval; // Reset to spawn first ship immediately
   }
 
   return {
