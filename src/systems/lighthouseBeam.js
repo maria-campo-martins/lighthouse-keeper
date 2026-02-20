@@ -3,6 +3,33 @@ import * as THREE from "three";
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
 export function createLighthouseBeam(scene, camera, CONFIG) {
+  const _coneOrigin = new THREE.Vector3();
+  const _coneDir = new THREE.Vector3();
+  const _zAxis = new THREE.Vector3(0, 0, 1);
+  const _tmpQuat = new THREE.Quaternion();
+  // Add these temps near the top of createLighthouseBeam
+    const _spotCenter = new THREE.Vector3();
+
+    function getSpotCenterOnPlane(planeY = 0.6) {
+    // Tip and dir in world (you already compute these in getCone)
+    beamGroup.getWorldPosition(_coneOrigin);
+
+    beamGroup.getWorldQuaternion(_tmpQuat);
+    _coneDir.copy(_zAxis).applyQuaternion(_tmpQuat).normalize();
+
+    const dy = _coneDir.y;
+    if (Math.abs(dy) < 1e-4) return null; // nearly parallel to plane => no stable intersection
+
+    const t = (planeY - _coneOrigin.y) / dy;
+    if (t <= 0) return null; // intersection behind the lamp
+
+    // optional: require it to be within beam length
+    if (t > CONFIG.beamLength) return null;
+
+    _spotCenter.copy(_coneOrigin).addScaledVector(_coneDir, t);
+    return _spotCenter.clone();
+    }
+
   // Initialize rotation with configurable initial values
   const beamRotation = { 
     yaw: CONFIG.beamInitialYaw ?? 0, 
@@ -10,9 +37,6 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
   };
   const keysPressed = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
 
-  // --- Geometry: cone points along +Y by default ---
-  // Default cone: tip at y=+h/2, base at y=-h/2
-  // We keep geometry in default position and position the mesh instead
   const beamGeometry = new THREE.ConeGeometry(
     CONFIG.beamRadius,
     CONFIG.beamLength,
@@ -24,33 +48,26 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
   const beamMaterial = new THREE.MeshBasicMaterial({
     color: CONFIG.beamColor,
     transparent: true,
-    opacity: 0.0,                 // start invisible
-    side: THREE.DoubleSide,        // show both sides so circular end is visible
+    opacity: 0.0,
+    side: THREE.DoubleSide,
     depthWrite: false,
-    blending: THREE.AdditiveBlending, // looks more "lighty"
+    blending: THREE.AdditiveBlending,
   });
 
   const beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
 
-  // Rotate cone 90° around X-axis so it points forward
-  // Default cone: tip at +Y, base at -Y
-  // After rotation: tip points along +Z, base extends along -Z
+  // Rotate cone 90° around X-axis so it points forward (+Z in group space)
   beamMesh.rotation.x = -Math.PI / 2;
-  
-  // Position mesh so tip is at beamGroup origin and base extends forward
-  // By positioning at beamLength/2, the cone tip aligns with beamGroup origin (z=0)
-  // and the circular base extends forward to z=beamLength, making it visible
+
+  // Tip at group origin; base at z=beamLength
   beamMesh.position.z = CONFIG.beamLength / 2;
 
   const beamGroup = new THREE.Group();
   beamGroup.add(beamMesh);
 
-  // Attach to camera: inherits camera position + rotation automatically
   camera.add(beamGroup);
   scene.add(camera);
 
-  // Place the lamp slightly in front of camera, in camera-local space.
-  // camera forward is -Z so lampOffsetZ must be negative.
   const z = (CONFIG.lampOffsetZ ?? -2.5);
   beamGroup.position.set(
     CONFIG.lampOffsetX ?? 0,
@@ -58,8 +75,7 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
     (z === 0 ? -2.5 : z)
   );
 
-  // Spot light to illuminate objects in the scene
-  // Positioned at beamGroup origin (where cone tip is)
+  // Spot light (visual only; does not affect getCone)
   const beamLight = new THREE.SpotLight(
     CONFIG.beamColor,
     2,
@@ -70,16 +86,13 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
   beamLight.position.set(0, 0, 0);
   beamGroup.add(beamLight);
 
-  // Target positioned at the end of the beam (where circular base is)
   beamLight.target.position.set(0, 0, CONFIG.beamLength);
   beamGroup.add(beamLight.target);
 
-  // Initialize beam rotation to configured initial values
   beamGroup.rotation.order = "YXZ";
   beamGroup.rotation.y = beamRotation.yaw;
   beamGroup.rotation.x = beamRotation.pitch;
 
-  // Visibility control (prevents intro rendering)
   let enabled = false;
   beamGroup.visible = false;
 
@@ -106,13 +119,11 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
   }
 
   function resetAim() {
-    // Reset to initial configured rotation values
     const initialYaw = CONFIG.beamInitialYaw ?? 0;
     const initialPitch = CONFIG.beamInitialPitch ?? 0;
     beamRotation.yaw = initialYaw;
     beamRotation.pitch = initialPitch;
-    
-    // Apply initial rotation to the beam group
+
     beamGroup.rotation.order = "YXZ";
     beamGroup.rotation.y = initialYaw;
     beamGroup.rotation.x = initialPitch;
@@ -122,29 +133,38 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
   function update() {
     if (!enabled) return;
 
-    if (keysPressed.ArrowLeft){
-    beamRotation.yaw += CONFIG.beamRotationSpeed;
-    console.log(" yaw is ", beamRotation.yaw);
-    }
-    if (keysPressed.ArrowRight) {
-      beamRotation.yaw -= CONFIG.beamRotationSpeed;
-      console.log(" yaw is ", beamRotation.yaw);
-    }
+    if (keysPressed.ArrowLeft)  beamRotation.yaw += CONFIG.beamRotationSpeed;
+    if (keysPressed.ArrowRight) beamRotation.yaw -= CONFIG.beamRotationSpeed;
 
     const maxPitch = Math.PI / 3;
     if (keysPressed.ArrowUp) {
       beamRotation.pitch = clamp(beamRotation.pitch - CONFIG.beamRotationSpeed, -maxPitch, maxPitch);
-      console.log(" pitch is ", beamRotation.pitch);
     }
-    if (keysPressed.ArrowDown){
+    if (keysPressed.ArrowDown) {
       beamRotation.pitch = clamp(beamRotation.pitch + CONFIG.beamRotationSpeed, -maxPitch, maxPitch);
-      console.log(" pitch is ", beamRotation.pitch);
     }
-    // Local offsets from the camera's direction
+
     beamGroup.rotation.order = "YXZ";
     beamGroup.rotation.y = beamRotation.yaw;
     beamGroup.rotation.x = beamRotation.pitch;
   }
 
-  return { update, setEnabled, setOpacityForProgress, resetAim };
+  // OLD behavior: use visual cone geometry half-angle
+  function getCone() {
+    beamGroup.getWorldPosition(_coneOrigin);
+
+    beamGroup.getWorldQuaternion(_tmpQuat);
+    _coneDir.copy(_zAxis).applyQuaternion(_tmpQuat).normalize();
+
+    const angle = Math.atan(CONFIG.beamRadius / CONFIG.beamLength);
+
+    return {
+      origin: _coneOrigin.clone(),
+      dir: _coneDir.clone(),
+      angle,
+      length: CONFIG.beamLength,
+    };
+  }
+
+  return { update, setEnabled, setOpacityForProgress, resetAim, getCone, getSpotCenterOnPlane };
 }

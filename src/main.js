@@ -161,8 +161,8 @@ function animate() {
 
       beam.setOpacityForProgress(prog);
       beam.update();
-
-      shipSystem.update(dt, tPlay);
+      const spot = beam.getSpotCenterOnPlane(CONFIG.shipY ?? CONFIG.shipY);
+      shipSystem.update(dt, tPlay, spot);
 
       const hits = rockSystem.checkShipCollisions(shipSystem.ships);
       if (hits.length) {
