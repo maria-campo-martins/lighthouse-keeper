@@ -33,9 +33,11 @@ export const CONFIG = {
   beamColor: 0xffffaa,
   beamOpacity: 0.35,
   beamRotationSpeed: 0.02,
+  beamInitialYaw: 3.11,      // Initial horizontal rotation (left/right) in radians
+  beamInitialPitch: -0.24,    // Initial vertical rotation (up/down) in radians
   lampOffsetX: 0,
   lampOffsetY: -2,
-  lampOffsetZ: -4.0,
+  lampOffsetZ: -2.0,
 
   // One full loop duration (seconds) — ships + sunrise synced to this
   cycleDuration: 120,
