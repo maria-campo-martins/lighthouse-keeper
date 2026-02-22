@@ -163,7 +163,7 @@ function animate() {
       beam.update();
       const spot = beam.getSpotCenterOnPlane(CONFIG.shipY ?? CONFIG.shipY);
       shipSystem.update(dt, tPlay, spot);
-
+      playEnv.update(tPlay);
       const hits = rockSystem.checkShipCollisions(shipSystem.ships);
       if (hits.length) {
         // ...
