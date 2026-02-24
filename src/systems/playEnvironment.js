@@ -39,9 +39,9 @@ function makeOceanMaterial(CONFIG, normalTex, foamTex) {
     uFoamMap: { value: foamTex },
 
     // texture tuning
-    uNormalStrength: { value: 1.0 }, // try 0.7–1.4
+    uNormalStrength: { value: 1.4 }, // try 0.7–1.4
     uFoamStrength: { value: 0.30 },  // try 0.0–0.6
-    uTexScroll: { value: 0.025 },    // try 0.01–0.06
+    uTexScroll: { value: 0.03 },    // try 0.01–0.06
     uHorizonBoost: { value: 1.0 },   // try 0.4–1.6
   };
 
@@ -183,7 +183,9 @@ function makeOceanMaterial(CONFIG, normalTex, foamTex) {
       float spec = pow(max(dot(N2, H), 0.0), specPow);
 
       // Body color (visible at night)
-      vec3 base = oceanCol * (0.45 + 0.35 * ndl);
+      float lift = 0.65;                 
+      float diffuse = (0.25 + 0.75*ndl); 
+      vec3 base = oceanCol * (lift * diffuse + 0.10 * horizon);
 
       // Fake reflection (sky + horizon band)
       vec3 reflection = skyCol + vec3(0.25, 0.30, 0.40) * horizon;
@@ -201,7 +203,7 @@ function makeOceanMaterial(CONFIG, normalTex, foamTex) {
 
       // Manual fog, reduced so the ocean stays readable
       float fogFactor = smoothstep(uFogNear, uFogFar, vFogDepth);
-      fogFactor *= 0.20;
+      fogFactor *= 0.000001;
       color = mix(color, uFogColor, fogFactor);
 
       gl_FragColor = vec4(color, 1.0);
@@ -250,7 +252,6 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
   const _sky = new THREE.Color();
   const _fog = new THREE.Color();
 
-  const fogRef = new THREE.Fog(CONFIG.fogColorNight, CONFIG.fogNear, CONFIG.fogFar);
   const bgNight = new THREE.Color(CONFIG.skyColorNight);
 
   // --- ocean mesh ---
@@ -271,9 +272,18 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
   const ambient = new THREE.AmbientLight(CONFIG.ambientColor, CONFIG.ambientIntensity);
   root.add(ambient);
 
-  const dir = new THREE.DirectionalLight(0xffffff, 0.35);
-  dir.position.set(200, 400, 100);
-  root.add(dir);
+  // Moon key light (main visibility for rocks)
+  const moon = new THREE.DirectionalLight(0xbfd6ff, 1.1); // 0.8–1.6
+  moon.position.set(200, 400, 100);
+  root.add(moon);
+
+  // Soft sky/ocean fill (makes shadows readable)
+  const hemi = new THREE.HemisphereLight(
+    CONFIG.skyColorNight,   // sky tint
+    CONFIG.oceanColorNight, // ground/ocean bounce
+    0.55                    // 0.25–0.8
+  );
+  root.add(hemi);
 
   // temp vector to avoid allocations
   const _tmp = new THREE.Vector3();
@@ -285,7 +295,7 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
     root.visible = active;
     if (active) {
       scene.background = bgNight;
-      scene.fog = fogRef; // you can keep global fog for everything else
+      scene.fog = null;
     }
   }
 
@@ -304,7 +314,6 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
       new THREE.Color(CONFIG.fogColorDawn),
       progress
     );
-    fogRef.color.copy(_fog);
 
     // drive shader blend + ocean-only fog color
     oceanMat.uniforms.uDawn.value = progress;
@@ -324,7 +333,7 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
     oceanMat.uniforms.uTime.value = elapsedTimeSeconds;
 
     // Sync shader light dir to the DirectionalLight (so spec highlights make sense)
-    _tmp.copy(dir.position).normalize().negate();
+    _tmp.copy(moon.position).normalize().negate();
     oceanMat.uniforms.uLightDir.value.copy(_tmp);
   }
 

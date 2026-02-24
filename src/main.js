@@ -105,6 +105,7 @@ function startPlay(timeNow) {
     zMax: 520,
     oceanY: 0,
     minSpacing: 25,
+    envMap: scene.environment,
   });
 
   // Cycle manager AFTER ships exist

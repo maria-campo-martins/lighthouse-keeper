@@ -6,58 +6,174 @@ function randRange(min, max) {
   return min + Math.random() * (max - min);
 }
 
-function makeRockMesh({ radius = 6 } = {}) {
-  // Low-poly rock-ish shape
-  const geo = new THREE.IcosahedronGeometry(radius, 0);
-  const mat = new THREE.MeshBasicMaterial({ color: 0x2e2e2e });
-  const mesh = new THREE.Mesh(geo, mat);
+// Adds subtle “wet near waterline” shading while staying MeshStandardMaterial.
+// This is one of the highest-impact realism upgrades for rocks near water.
+function applyWetnessPatch(mat, { oceanY = 0, wetHeight = 6.0, wetDarken = 0.35, wetRoughMult = 0.55 } = {}) {
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uWaterY = { value: oceanY };
+    shader.uniforms.uWetHeight = { value: wetHeight };
+    shader.uniforms.uWetDarken = { value: wetDarken };
+    shader.uniforms.uWetRoughMult = { value: wetRoughMult };
 
-  // Squash/scale a bit so they aren't perfect spheres
-  mesh.scale.set(randRange(0.8, 1.4), randRange(0.5, 1.0), randRange(0.8, 1.4));
+    // vertex: pass world Y
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        "#include <common>",
+        `
+        #include <common>
+        varying float vWorldY;
+        `
+      )
+      .replace(
+        "#include <begin_vertex>",
+        `
+        #include <begin_vertex>
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        vWorldY = wp.y;
+        `
+      );
+
+    // fragment: darken + reduce roughness near the waterline
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        "#include <common>",
+        `
+        #include <common>
+        varying float vWorldY;
+        uniform float uWaterY;
+        uniform float uWetHeight;
+        uniform float uWetDarken;
+        uniform float uWetRoughMult;
+        `
+      )
+      .replace(
+        "#include <roughnessmap_fragment>",
+        `
+        #include <roughnessmap_fragment>
+
+        float wet = 1.0 - smoothstep(uWaterY, uWaterY + uWetHeight, vWorldY);
+        diffuseColor.rgb *= mix(1.0, 1.0 - uWetDarken, wet);
+        roughnessFactor *= mix(1.0, uWetRoughMult, wet);
+        `
+      );
+
+    mat.userData.shader = shader;
+  };
+
+  mat.needsUpdate = true;
+}
+
+// Make rocks feel less like perfect low-poly blobs:
+// - slight extra subdivision (detail=1)
+// - vertex noise
+// - Standard material (lit + fog + tonemapping)
+// - optional wetness near ocean
+function makeRockMesh({
+  radius = 6,
+  oceanY = 0,
+  envMap = null,
+  enableWetness = true,
+} = {}) {
+  // Slightly higher detail than 0 gives better shading with little cost
+  const geo = new THREE.IcosahedronGeometry(radius, 1);
+
+  // Vertex noise: breaks perfect symmetry (cheap realism)
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+
+    // Noise proportional-ish to rock size
+    const n = randRange(-0.12, 0.12) * radius; // tweak 0.08–0.18
+    pos.setXYZ(i, x + n, y + n * 0.6, z + n);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+
+  const mat = new THREE.MeshStandardMaterial({
+    // Slight cool tint so rocks inherit the ocean/sky palette better
+    color: new THREE.Color(0x2f3a46),
+    roughness: 0.9,
+    metalness: 0.0,
+
+    // If you have an environment map (HDRI/PMREM), this helps rocks match the ocean’s reflections
+    envMap: envMap ?? null,
+    envMapIntensity: envMap ? 0.6 : 0.0,
+  });
+
+  if (enableWetness) {
+    applyWetnessPatch(mat, {
+      oceanY,
+      wetHeight: Math.max(4.0, radius * 0.55), // scales a bit with rock size
+      wetDarken: 0.40,
+      wetRoughMult: 0.50,
+    });
+  }
+
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = false;
+  mesh.receiveShadow = true;
+
+  // Squash/scale so they aren’t spheres
+  mesh.scale.set(randRange(0.85, 1.5), randRange(0.55, 1.05), randRange(0.85, 1.5));
   mesh.rotation.set(randRange(0, Math.PI), randRange(0, Math.PI), randRange(0, Math.PI));
 
   return mesh;
 }
 
 function getShipApproxSphere(shipMesh, outSphere) {
-  // Cheap ship collider: a sphere around the whole ship group
-  // NOTE: calling setFromObject is a little expensive but fine for 3 ships.
   const box = new THREE.Box3().setFromObject(shipMesh);
   box.getBoundingSphere(outSphere);
   return outSphere;
 }
 
 // ---------- public API ----------
-export function createRockSystem(scene, {
-  count = 8,
-  // Placement region (world space)
-  xMin = -200,
-  xMax = 200,
-  zMin = 120,
-  zMax = 520,
+export function createRockSystem(
+  scene,
+  {
+    count = 8,
 
-  // Ocean height (your ocean plane is y=0)
-  oceanY = 0,
+    // Placement region (world space)
+    xMin = -200,
+    xMax = 200,
+    zMin = 120,
+    zMax = 520,
 
-  // Rock sizing
-  rockRadiusMin = 5,
-  rockRadiusMax = 14,
+    // Ocean height (your ocean plane is y=0)
+    oceanY = 0,
 
-  // Keep rocks from spawning too close to lanes/shore if you want
-  minSpacing = 20, // between rocks
-} = {}) {
+    // Optional: pass scene.environment (PMREM/HDR) for better integration
+    envMap = null,
+
+    // Rock sizing
+    rockRadiusMin = 5,
+    rockRadiusMax = 14,
+
+    // Spacing between rocks
+    minSpacing = 20,
+
+    // Visual tuning
+    enableWetness = true,
+  } = {}
+) {
   const rocks = [];
 
-  // store as bounding spheres in world space
-  // rock.collider = { center: Vector3, radius: number }
   function addRockAt(x, z, radius) {
-    const mesh = makeRockMesh({ radius });
-    mesh.position.set(x, oceanY + radius * 0.25, z); // slightly above water
+    const mesh = makeRockMesh({
+      radius,
+      oceanY,
+      envMap,
+      enableWetness,
+    });
 
-    // collider is a sphere in world space (static)
+    // Slightly above water; wetness shader handles the base dark/shiny look
+    mesh.position.set(x, oceanY + radius * 0.20, z);
+
+    // Collider sphere (static)
     const collider = {
-      center: new THREE.Vector3(x, oceanY + radius * 0.25, z),
-      radius: radius * 0.9, // slightly forgiving
+      center: new THREE.Vector3(x, oceanY + radius * 0.20, z),
+      radius: radius * 0.9,
     };
 
     rocks.push({ mesh, collider });
@@ -69,7 +185,7 @@ export function createRockSystem(scene, {
       const dx = x - r.collider.center.x;
       const dz = z - r.collider.center.z;
       const d2 = dx * dx + dz * dz;
-      const minD = (minSpacing + r.collider.radius);
+      const minD = minSpacing + r.collider.radius;
       if (d2 < minD * minD) return false;
     }
     return true;
@@ -88,21 +204,21 @@ export function createRockSystem(scene, {
   }
 
   // Collision check: rocks (static spheres) vs ships (approx spheres)
-  // Returns array of collision events: [{ shipIndex, rockIndex }]
   const _shipSphere = new THREE.Sphere(new THREE.Vector3(), 1);
 
-  function checkShipCollisions(ships, {
-    // optional behavior knobs
-    markCrashed = true,
-    hideOnCrash = true,
-  } = {}) {
+  function checkShipCollisions(
+    ships,
+    {
+      markCrashed = true,
+      hideOnCrash = true,
+    } = {}
+  ) {
     const hits = [];
 
     for (let si = 0; si < ships.length; si++) {
       const ship = ships[si];
       if (!ship || !ship.mesh) continue;
 
-      // If your ship system uses flags, respect them
       if (ship.crashed || ship.active === false) continue;
       if (ship.mesh.visible === false) continue;
 
@@ -121,7 +237,6 @@ export function createRockSystem(scene, {
           if (markCrashed) ship.crashed = true;
           if (hideOnCrash) ship.mesh.visible = false;
 
-          // stop checking other rocks for this ship after first hit
           break;
         }
       }
