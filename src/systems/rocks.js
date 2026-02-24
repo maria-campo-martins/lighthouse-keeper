@@ -1,6 +1,24 @@
 // rocks.js
 import * as THREE from "three";
 
+// --- rock textures (load once) ---
+const texLoader = new THREE.TextureLoader();
+
+const rockDiffuse = texLoader.load("/textures/rocktexture.jpg");
+rockDiffuse.colorSpace = THREE.SRGBColorSpace;
+rockDiffuse.wrapS = rockDiffuse.wrapT = THREE.RepeatWrapping;
+rockDiffuse.repeat.set(2, 2); // tweak 1–4
+
+const rockNormal = texLoader.load("/textures/rocknormal.jpg");
+rockNormal.colorSpace = THREE.NoColorSpace;
+rockNormal.wrapS = rockNormal.wrapT = THREE.RepeatWrapping;
+rockNormal.repeat.set(2, 2);
+
+const rockRough = texLoader.load("/textures/rockroughness.jpg");
+rockRough.colorSpace = THREE.NoColorSpace;
+rockRough.wrapS = rockRough.wrapT = THREE.RepeatWrapping;
+rockRough.repeat.set(2, 2);
+
 // ---------- helpers ----------
 function randRange(min, max) {
   return min + Math.random() * (max - min);
@@ -92,14 +110,15 @@ function makeRockMesh({
   geo.computeVertexNormals();
 
   const mat = new THREE.MeshStandardMaterial({
-    // Slight cool tint so rocks inherit the ocean/sky palette better
-    color: new THREE.Color(0x2f3a46),
-    roughness: 0.9,
+    map: rockDiffuse,
+    normalMap: rockNormal,
+    roughnessMap: rockRough,
+
+    roughness: 1.0,    // multiplier (keep 1.0 first)
     metalness: 0.0,
 
-    // If you have an environment map (HDRI/PMREM), this helps rocks match the ocean’s reflections
-    envMap: envMap ?? null,
-    envMapIntensity: envMap ? 0.6 : 0.0,
+    // optional: helps normal map read more
+    normalScale: new THREE.Vector2(1.0, 1.0), // try 0.7–1.6
   });
 
   if (enableWetness) {
