@@ -188,6 +188,11 @@ export function createIntroEnvironment(scene, renderer, CONFIG) {
   // Calculate plateau top Y for lighthouse positioning
   const plateauTopY = 35 + 70 / 2;
 
+  const _fogColor = new THREE.Color();
+  const _ambColor = new THREE.Color();
+  const _oceanColor = new THREE.Color();
+  const _lighthousePos = new THREE.Vector3(0, plateauTopY + 70, 20);
+
   // Sun light - will arc up and over lighthouse towards camera
   const sun = new THREE.DirectionalLight(0xffe469, 1.8); // Yellow sun light
   // Sun path: starts behind lighthouse, arcs up and over, moves towards camera and off screen
@@ -387,7 +392,7 @@ export function createIntroEnvironment(scene, renderer, CONFIG) {
   function setActive(active) {
     root.visible = active;
     if (active) {
-      scene.background = bgSunsetStart.clone();
+      scene.background = null;
       scene.fog = fogSunset;
       fogSunset.color.copy(fogColorStart);
       ambient.color.copy(ambientColorStart);
@@ -471,28 +476,20 @@ export function createIntroEnvironment(scene, renderer, CONFIG) {
     fogSunset.density = fogDensity;
     
     // Interpolate colors from blue sunset to dark night
-    // Background color transition
-    const bgColor = new THREE.Color();
-    bgColor.lerpColors(bgSunsetStart, bgSunsetEnd, progress);
-    scene.background = bgColor;
-    
-    // Fog color transition
-    const fogColor = new THREE.Color();
-    fogColor.lerpColors(fogColorStart, fogColorEnd, progress);
-    fogSunset.color.copy(fogColor);
-    
-    // Ambient light color transition
-    const ambientColor = new THREE.Color();
-    ambientColor.lerpColors(ambientColorStart, ambientColorEnd, progress);
-    ambient.color.copy(ambientColor);
+    _fogColor.lerpColors(fogColorStart, fogColorEnd, progress);
+    fogSunset.color.copy(_fogColor);
+
+    _ambColor.lerpColors(ambientColorStart, ambientColorEnd, progress);
+    ambient.color.copy(_ambColor);
+
+    _oceanColor.lerpColors(oceanColorStart, oceanColorEnd, progress);
+    oceanMat.color.copy(_oceanColor);
+
+    lighthouseSpot.target.position.copy(_lighthousePos);
     
     // Also fade ambient intensity as it gets darker
     ambient.intensity = 0.4 - (progress * 0.25); // Fade from 0.4 to 0.15
-    
-    // Ocean color transition from dawn to night
-    const oceanColor = new THREE.Color();
-    oceanColor.lerpColors(oceanColorStart, oceanColorEnd, progress);
-    oceanMat.color.copy(oceanColor);
+
   }
 
   return {

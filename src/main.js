@@ -8,6 +8,8 @@ import { createIntroCamera } from "./systems/introCamera.js";
 import { createCycleManager } from "./systems/cycleManager.js";
 import { createShipSystem } from "./systems/ships.js";
 import { createRockSystem } from "./systems/rocks.js";
+import { createSkyDome } from "./systems/sky.js";
+
 
 const scene = new THREE.Scene();
 const clock = new THREE.Clock();
@@ -29,6 +31,10 @@ document.body.appendChild(renderer.domElement);
 // Environments
 const introEnv = createIntroEnvironment(scene, renderer, CONFIG);
 const playEnv = createPlayEnvironment(scene, renderer, CONFIG);
+const sky = createSkyDome(scene, renderer, CONFIG);
+sky.setColors({ dawn: 0x4a90e2, night: CONFIG.skyColorNight });
+sky.setActive(true);
+sky.setBrightness(1.4); // crank if too dark under ACES
 
 introEnv.setActive(true);
 playEnv.setActive(false);
@@ -133,15 +139,13 @@ function animate() {
       if (introStartTime === null) {
         introStartTime = time;
       }
-      
       const finished = intro.update(time);
-      
-      // Update sunset animation (sun setting)
+    
       const introProgress = Math.min(1.0, (time - introStartTime) / 6.0);
       introEnv.updateSunset(introProgress);
-
-      // Night moonlight look (introEnv already set background/fog/lights)
-      // If your playEnv also has applyDawn, DON'T call it here.
+      sky.setDawn(1.0 - introProgress);
+      sky.setBrightness(1.6);
+      sky.update(camera, time);
 
       if (finished) {
         mode = MODE.PLAY;
@@ -159,7 +163,9 @@ function animate() {
 
       const prog = cycle.update(tPlay);
       playEnv.applyDawn(prog);   
-
+      sky.setDawn(prog);
+      sky.setBrightness(1.4);
+      sky.update(camera, tPlay);
       beam.setOpacityForProgress(prog);
       beam.update();
       const spot = beam.getSpotCenterOnPlane(CONFIG.shipY ?? CONFIG.shipY);

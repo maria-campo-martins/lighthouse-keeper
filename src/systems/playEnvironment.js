@@ -294,7 +294,7 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
   function setActive(active) {
     root.visible = active;
     if (active) {
-      scene.background = bgNight;
+      scene.background = null; 
       scene.fog = null;
     }
   }
@@ -302,24 +302,16 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
   function applyDawn(progress) {
     if (!root.visible) return;
 
-    _sky.lerpColors(
-      new THREE.Color(CONFIG.skyColorNight),
-      new THREE.Color(CONFIG.skyColorDawn),
-      progress
-    );
-    scene.background.copy(_sky);
-
+    // keep your ocean blending
     _fog.lerpColors(
       new THREE.Color(CONFIG.fogColorNight),
       new THREE.Color(CONFIG.fogColorDawn),
       progress
     );
 
-    // drive shader blend + ocean-only fog color
     oceanMat.uniforms.uDawn.value = progress;
     oceanMat.uniforms.uFogColor.value.copy(_fog);
 
-    // also lerp the shader’s ocean/sky colors if your CONFIG changes over time
     oceanMat.uniforms.uOceanNight.value.set(CONFIG.oceanColorNight);
     oceanMat.uniforms.uOceanDawn.value.set(CONFIG.oceanColorDawn);
     oceanMat.uniforms.uSkyNight.value.set(CONFIG.skyColorNight);

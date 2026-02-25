@@ -16,9 +16,9 @@ export const CONFIG = {
   ambientIntensity: 0.35,      // was 0.15
   ambientColor: 0x2a2f44,      // was 0x1a1a2e
 
-  skyColorNight:   0x0d1c3a,   // was 0x0a1428
+  skyColorNight:   0x0b1633,   // was 0x0a1428
   oceanColorNight: 0x0b2a4a,   // was 0x030a17  (big lift)
-  fogColorNight:   0x0b1530,   // was 0x080c18
+  fogColorNight: 0x070b18,   // was 0x080c18
   fogNear: 700,
   fogFar: 2000,
 
