@@ -4,19 +4,120 @@ import * as THREE from "three";
 function makeShipMesh() {
   const ship = new THREE.Group();
 
-  const hull = new THREE.Mesh(
-    new THREE.BoxGeometry(10, 2, 18),
-    new THREE.MeshBasicMaterial({ color: 0x8b5a2b })
-  );
+  // -----------------------------
+  // Materials (PBR + reacts to light)
+  // -----------------------------
+  const hullMat = new THREE.MeshStandardMaterial({
+    color: 0x6b4a2d,
+    roughness: 0.85,
+    metalness: 0.05,
+  });
+
+  const deckMat = new THREE.MeshStandardMaterial({
+    color: 0x3a2a1a,
+    roughness: 0.95,
+    metalness: 0.0,
+  });
+
+  const cabinMat = new THREE.MeshStandardMaterial({
+    color: 0xd6d6d6,
+    roughness: 0.7,
+    metalness: 0.05,
+  });
+
+  const windowMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    emissive: 0xffcc66,
+    emissiveIntensity: 1.2,
+    roughness: 0.2,
+    metalness: 0.0,
+  });
+
+  const metalMat = new THREE.MeshStandardMaterial({
+    color: 0x555555,
+    roughness: 0.4,
+    metalness: 0.9,
+  });
+
+  // -----------------------------
+  // Hull: a tapered box (boat-like)
+  // -----------------------------
+  const hullGeo = new THREE.BoxGeometry(10, 2, 18, 2, 1, 6);
+
+  // Taper the bow (front, +Z) and slightly taper the stern (-Z)
+  const pos = hullGeo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+
+    // z goes from -9..+9
+    const t = (z + 9) / 18; // 0 at stern, 1 at bow
+
+    // Width taper: narrower at bow, a touch narrower at stern
+    const widthScale = THREE.MathUtils.lerp(0.78, 0.35, t); // stern->bow
+    pos.setX(i, x * widthScale);
+
+    // Give a mild "keel" by pulling bottom vertices inward a bit
+    if (y < 0) pos.setX(i, pos.getX(i) * 0.9);
+  }
+  hullGeo.computeVertexNormals();
+
+  const hull = new THREE.Mesh(hullGeo, hullMat);
   hull.position.y = 1;
   ship.add(hull);
 
-  const cabin = new THREE.Mesh(
-    new THREE.BoxGeometry(6, 3, 6),
-    new THREE.MeshBasicMaterial({ color: 0xd9d9d9 })
-  );
-  cabin.position.set(0, 3, -2);
+  // Bow tip (small wedge)
+  const bow = new THREE.Mesh(new THREE.ConeGeometry(2.2, 3.0, 8, 1), hullMat);
+  bow.rotation.x = Math.PI * 0.5;
+  bow.position.set(0, 1.0, 10.0);
+  ship.add(bow);
+
+  // Deck slab
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(8.5, 0.35, 15), deckMat);
+  deck.position.set(0, 2.05, 0.0);
+  ship.add(deck);
+
+  // -----------------------------
+  // Cabin + windows
+  // -----------------------------
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(5.8, 2.8, 5.8), cabinMat);
+  cabin.position.set(0, 3.35, -2.2);
   ship.add(cabin);
+
+  const window1 = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.05), windowMat);
+  window1.position.set(-1.6, 3.55, 0.75);
+  ship.add(window1);
+
+  const window2 = window1.clone();
+  window2.position.x = 1.6;
+  ship.add(window2);
+
+  // Smokestack
+  const stack = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 2.2, 10), metalMat);
+  stack.position.set(1.6, 5.0, -3.2);
+  ship.add(stack);
+
+  // Rail posts (tiny detail, big realism)
+  const postGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.7, 6);
+  for (let i = 0; i < 8; i++) {
+    const z = THREE.MathUtils.lerp(-6.5, 6.5, i / 7);
+    const left = new THREE.Mesh(postGeo, metalMat);
+    left.position.set(-4.2, 2.55, z);
+    ship.add(left);
+
+    const right = new THREE.Mesh(postGeo, metalMat);
+    right.position.set(4.2, 2.55, z);
+    ship.add(right);
+  }
+
+  // Make shadows possible if your renderer/lights are set up
+  ship.traverse((o) => {
+    if (o.isMesh) {
+      o.castShadow = true;
+      o.receiveShadow = true;
+    }
+  });
 
   return ship;
 }

@@ -4,8 +4,8 @@ import * as THREE from "three";
 // Call once when you create the renderer (recommended for night water visibility)
 export function configureRendererForOcean(renderer) {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.25; // tweak 1.1–1.6
+  renderer.toneMapping = THREE.NoToneMapping;
+  renderer.toneMappingExposure = 1.0;
 }
 
 function makeOceanMaterial(CONFIG, normalTex, foamTex) {
@@ -18,6 +18,9 @@ function makeOceanMaterial(CONFIG, normalTex, foamTex) {
     uOceanDawn: { value: new THREE.Color(CONFIG.oceanColorDawn) },
     uSkyNight: { value: new THREE.Color(CONFIG.skyColorNight) },
     uSkyDawn: { value: new THREE.Color(CONFIG.skyColorDawn) },
+    uHorizonLift: { value: 0.35 },
+    uHorizonLiftTint: { value: new THREE.Color(0xffffff) },
+    uNoFresnel: { value: 0.0 }, 
 
     // lighting
     uLightDir: { value: new THREE.Vector3(0.3, 1.0, 0.2).normalize() },
@@ -128,6 +131,9 @@ function makeOceanMaterial(CONFIG, normalTex, foamTex) {
     uniform vec3 uSkyNight;
     uniform vec3 uSkyDawn;
 
+    uniform float uHorizonLift;
+    uniform vec3 uHorizonLiftTint;
+
     uniform vec3 uLightDir;
     uniform vec3 uLightColor;
 
@@ -141,6 +147,7 @@ function makeOceanMaterial(CONFIG, normalTex, foamTex) {
     uniform float uFoamStrength;
     uniform float uTexScroll;
     uniform float uHorizonBoost;
+    uniform float uNoFresnel;
 
     varying vec3 vWorldPos;
     varying vec3 vWorldNormal;
@@ -167,12 +174,13 @@ function makeOceanMaterial(CONFIG, normalTex, foamTex) {
       // Base wave normal (from vertex)
       vec3 N = normalize(vWorldNormal);
 
-      // Blend ripples into normal: use nTex.xz as xz perturbation (normal map is in tangent-ish space)
+      // Blend ripples into normal
       vec3 N2 = normalize(N + vec3(nTex.x, 0.0, nTex.y) * uNormalStrength);
 
       float NoV = max(dot(N2, V), 0.0);
-      float fresnel = pow(1.0 - NoV, 4.0);
-      float horizon = pow(1.0 - NoV, 2.0) * uHorizonBoost;
+
+      float fresnel = (uNoFresnel > 0.5) ? 0.0 : pow(1.0 - NoV, 4.0);
+      float horizon = (uNoFresnel > 0.5) ? 0.0 : pow(1.0 - NoV, 2.0) * uHorizonBoost;
 
       vec3 L = normalize(uLightDir);
       float ndl = max(dot(N2, L), 0.0);
@@ -182,16 +190,21 @@ function makeOceanMaterial(CONFIG, normalTex, foamTex) {
       float specPow = mix(80.0, 220.0, fresnel);
       float spec = pow(max(dot(N2, H), 0.0), specPow);
 
-      // Body color (visible at night)
-      float lift = 0.65;                 
-      float diffuse = (0.25 + 0.75*ndl); 
+      // Body color
+      float lift = 0.65;
+      float diffuse = (0.25 + 0.75 * ndl);
       vec3 base = oceanCol * (lift * diffuse + 0.10 * horizon);
 
       // Fake reflection (sky + horizon band)
       vec3 reflection = skyCol + vec3(0.25, 0.30, 0.40) * horizon;
 
-      vec3 color = mix(base, reflection, clamp(fresnel + 0.15*horizon, 0.0, 1.0));
+      vec3 color = mix(base, reflection, clamp(fresnel + 0.15 * horizon, 0.0, 1.0));
       color += uLightColor * spec * (0.30 + 0.70 * fresnel);
+
+      // Horizon lift (add AFTER color exists)
+      float grazing = 1.0 - NoV;
+      float horizonMask = smoothstep(0.35, 0.95, grazing);
+      color += mix(skyCol, uHorizonLiftTint, 0.4) * (uHorizonLift * horizonMask);
 
       // Foam/noise breakup
       vec2 fuv = vWorldPos.xz * 0.004 + vec2(0.07, -0.03) * (uTime * uTexScroll * 2.2);
@@ -201,7 +214,7 @@ function makeOceanMaterial(CONFIG, normalTex, foamTex) {
       float foam = smoothstep(0.30, 0.75, crest) * foamTex * uFoamStrength;
       color = mix(color, vec3(1.0), foam * 0.12);
 
-      // Manual fog, reduced so the ocean stays readable
+      // Manual fog (yours is basically off; keep it off if you want)
       float fogFactor = smoothstep(uFogNear, uFogFar, vFogDepth);
       fogFactor *= 0.000001;
       color = mix(color, uFogColor, fogFactor);
