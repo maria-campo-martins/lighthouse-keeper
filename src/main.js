@@ -13,13 +13,33 @@ import { createSkyDome } from "./systems/sky.js";
 
 const scene = new THREE.Scene();
 const clock = new THREE.Clock();
-
 const camera = new THREE.PerspectiveCamera(
   CONFIG.cameraFov,
   window.innerWidth / window.innerHeight,
   CONFIG.cameraNear,
   CONFIG.cameraFar
 );
+
+
+let targetFov = camera.fov;
+const minFov = 25;   // zoom in
+const maxFov = 75;   // zoom out
+const zoomSpeed = 5; // smoothing speed
+
+let targetYaw = 0;
+let targetPitch = 0;
+let currentYaw = 0;
+let currentPitch = 0;
+const lookKeys = {
+  KeyA: false,
+  KeyD: false,
+  KeyW: false,
+  KeyS: false,
+};
+
+const keyLookSpeed = 1.6;
+const cameraSmooth = 8;
+const maxPitch = Math.PI / 3; // prevents flipping
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -130,6 +150,31 @@ window.addEventListener("resize", () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
+window.addEventListener("wheel", (e) => {
+  // prevent page scrolling
+  e.preventDefault();
+
+  const zoomSensitivity = 0.05;
+
+  targetFov += e.deltaY * zoomSensitivity;
+  targetFov = THREE.MathUtils.clamp(targetFov, minFov, maxFov);
+
+}, { passive: false });
+
+window.addEventListener("keydown", (e) => {
+  if (e.code in lookKeys) {
+    lookKeys[e.code] = true;
+    e.preventDefault();
+  }
+});
+
+window.addEventListener("keyup", (e) => {
+  if (e.code in lookKeys) {
+    lookKeys[e.code] = false;
+    e.preventDefault();
+  }
+});
+
 function animate() {
   const dt = Math.min(clock.getDelta(), 0.033);
   const time = clock.elapsedTime;
@@ -156,6 +201,16 @@ function animate() {
         camera.position.set(0, CONFIG.cameraPosY, CONFIG.cameraPosZ);
         camera.lookAt(0, 0, CONFIG.cameraLookZ);
 
+        camera.updateMatrixWorld(true);
+
+        const playEuler = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
+        currentYaw = playEuler.y;
+        currentPitch = playEuler.x;
+        targetYaw = currentYaw;
+        targetPitch = currentPitch;
+        camera.rotation.order = "YXZ";
+        camera.rotation.z = 0;  
+
         startPlay(time);
       }
     } else {
@@ -175,6 +230,24 @@ function animate() {
       if (hits.length) {
         // ...
       }
+    }
+    camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, dt * zoomSpeed);
+    camera.updateProjectionMatrix();
+
+    if (mode === MODE.PLAY) {
+      if (lookKeys.KeyA) targetYaw += keyLookSpeed * dt;
+      if (lookKeys.KeyD) targetYaw -= keyLookSpeed * dt;
+      if (lookKeys.KeyW) targetPitch += keyLookSpeed * dt;
+      if (lookKeys.KeyS) targetPitch -= keyLookSpeed * dt;
+
+      targetPitch = THREE.MathUtils.clamp(targetPitch, -maxPitch, maxPitch);
+
+      currentYaw = THREE.MathUtils.lerp(currentYaw, targetYaw, dt * cameraSmooth);
+      currentPitch = THREE.MathUtils.lerp(currentPitch, targetPitch, dt * cameraSmooth);
+
+      camera.rotation.order = "YXZ";
+      camera.rotation.y = currentYaw;
+      camera.rotation.x = currentPitch;
     }
 
     renderer.render(scene, camera);

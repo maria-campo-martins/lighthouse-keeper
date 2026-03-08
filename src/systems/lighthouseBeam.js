@@ -11,6 +11,8 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
     const _spotCenter = new THREE.Vector3();
 
     function getSpotCenterOnPlane(planeY = 0.6) {
+      if (!isBeamActive()) return null;
+      
     // Tip and dir in world (you already compute these in getCone)
     beamGroup.getWorldPosition(_coneOrigin);
 
@@ -94,21 +96,34 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
   beamGroup.rotation.x = beamRotation.pitch;
 
   let enabled = false;
+  let beamHiddenBySpace = false;
   beamGroup.visible = false;
 
   function onKeyDown(e) {
+    if (e.code === "Space") {
+      e.preventDefault();
+      beamHiddenBySpace = !beamHiddenBySpace;
+      beamGroup.visible = isBeamActive();
+      return;
+    }
+
     if (!enabled) return;
-    if (e.key in keysPressed) { keysPressed[e.key] = true; e.preventDefault(); }
+
+    if (e.key in keysPressed) {
+      keysPressed[e.key] = true;
+      e.preventDefault();
+    }
   }
-  function onKeyUp(e) {
-    if (e.key in keysPressed) { keysPressed[e.key] = false; e.preventDefault(); }
+
+function onKeyUp(e) {
+  if (e.key in keysPressed) { keysPressed[e.key] = false; e.preventDefault(); }
   }
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
 
   function setEnabled(v) {
     enabled = v;
-    beamGroup.visible = v;
+    beamGroup.visible = v && !beamHiddenBySpace;
     if (!v) beamMaterial.opacity = 0.0;
   }
 
@@ -151,6 +166,8 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
 
   // OLD behavior: use visual cone geometry half-angle
   function getCone() {
+    if (!isBeamActive()) return null;
+
     beamGroup.getWorldPosition(_coneOrigin);
 
     beamGroup.getWorldQuaternion(_tmpQuat);
@@ -166,5 +183,9 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
     };
   }
 
-  return { update, setEnabled, setOpacityForProgress, resetAim, getCone, getSpotCenterOnPlane };
+  function isBeamActive() {
+    return enabled && !beamHiddenBySpace;
+  }
+
+  return { update, setEnabled, setOpacityForProgress, resetAim, getCone, getSpotCenterOnPlane, isBeamActive };
 }

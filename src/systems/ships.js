@@ -1,6 +1,23 @@
 // ships.js
 import * as THREE from "three";
 
+function clampDirectionToShore(dir) {
+  dir.y = 0;
+
+  // Never allow the ship to point backward (+Z)
+  if (dir.z > -0.001) {
+    dir.z = -0.001;
+  }
+
+  if (dir.lengthSq() > 1e-8) {
+    dir.normalize();
+  } else {
+    dir.set(0, 0, -1);
+  }
+
+  return dir;
+}
+
 function makeShipMesh() {
   const ship = new THREE.Group();
 
@@ -237,13 +254,13 @@ export function createShipSystem(
             const step = -Math.sign(crossY) * Math.min(maxStep, ang);
 
             s.direction.applyAxisAngle(UP, step);
-            s.direction.y = 0;
-            s.direction.normalize();
+            clampDirectionToShore(s.direction);
           }
         }
       }
 
       // --- Move forward along heading ---
+      clampDirectionToShore(s.direction);
       s.mesh.position.addScaledVector(s.direction, s.speed * dt);
 
       // --- Bobbing ---
