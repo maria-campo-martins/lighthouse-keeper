@@ -18,6 +18,31 @@ function clampDirectionToShore(dir) {
   return dir;
 }
 
+function deactivateShip(scene, ship) {
+  if (!ship.active) return;
+  ship.active = false;
+  ship.mesh.visible = false;
+  scene.remove(ship.mesh); // optional, but cleaner than just hiding
+}
+
+function getShipXZRadiusFromBox(localBox) {
+  const size = new THREE.Vector3();
+  localBox.getSize(size);
+  return 0.5 * Math.max(size.x, size.z);
+}
+
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function buildLaneQueue(lanes) {
+  return shuffleArray([...lanes]);
+}
+
 function makeShipMesh() {
   const ship = new THREE.Group();
 
@@ -136,6 +161,9 @@ function makeShipMesh() {
     }
   });
 
+  ship.updateMatrixWorld(true);
+  ship.userData.localBox = new THREE.Box3().setFromObject(ship);
+
   return ship;
 }
 
@@ -164,16 +192,14 @@ export function createShipSystem(
     shipCount = 3,
     shipSpawnZ = 550,
     shipArriveZ = 30,
-    shipSpawnXMin = -120,
-    shipSpawnXMax = 120,
+
+    shipLanes = [-100, -60, -20, 20, 60, 100],
+
     shipY = 0.6,
     shipSpeedMin = 30,
     shipSpeedMax = 55,
     shipSpawnInterval = 2.0,
-    shipTurnRate = 2.5, // radians/sec
-
-    // NEW: gameplay control radius (in world units) around spotlight center
-    // Ship steers if it intersects this circle on the ocean plane.
+    shipTurnRate = 2.5,
     spotRange = 90,
   } = {}
 ) {
@@ -181,13 +207,22 @@ export function createShipSystem(
   let shipsSpawned = 0;
   let spawnTimer = shipSpawnInterval;
 
+  let laneQueue = buildLaneQueue(shipLanes);
+
+  function getNextSpawnX() {
+    if (laneQueue.length === 0) {
+      laneQueue = buildLaneQueue(shipLanes);
+    }
+    return laneQueue.pop();
+  }
+
   function spawnShip() {
     if (shipsSpawned >= shipCount) return;
 
     const mesh = makeShipMesh();
-    const randomX = THREE.MathUtils.randFloat(shipSpawnXMin, shipSpawnXMax);
+    const spawnX = getNextSpawnX();
+    mesh.position.set(spawnX, shipY, shipSpawnZ);
 
-    mesh.position.set(randomX, shipY, shipSpawnZ);
     mesh.rotation.y = Math.PI; // faces toward -Z visually
 
     const speed = THREE.MathUtils.randFloat(shipSpeedMin, shipSpeedMax);
@@ -195,18 +230,19 @@ export function createShipSystem(
     // heading toward shore initially (-Z)
     const direction = new THREE.Vector3(0, 0, -1);
 
-    // bounding sphere radius ONCE so partial overlap counts
-    mesh.updateMatrixWorld(true);
-    tmpBox.setFromObject(mesh);
-    tmpBox.getBoundingSphere(tmpSphere);
-    const radius = tmpSphere.radius;
-
+    // local-space box computed once when the ship mesh was created
+    const localBox = mesh.userData.localBox.clone();
+    const worldBox = new THREE.Box3();
+    const xzRadius = getShipXZRadiusFromBox(localBox);
+    
     ships.push({
       mesh,
       speed,
       direction,
       turnRate: shipTurnRate,
-      radius,
+      localBox,
+      worldBox,
+      xzRadius,
       bobPhase: Math.random() * Math.PI * 2,
       active: true,
     });
@@ -214,7 +250,7 @@ export function createShipSystem(
     scene.add(mesh);
     shipsSpawned += 1;
   }
-
+  
   // update signature now expects spotlight center on the ocean plane (Vector3 or null)
   // Pass this from main.js: shipSystem.update(dt, tPlay, beam.getSpotCenterOnPlane(shipY))
   function update(dt, time, spotCenter = null) {
@@ -229,7 +265,7 @@ export function createShipSystem(
       if (!s.active) continue;
 
       // --- Steering: if ship intersects control circle around spotlight center, steer toward it ---
-      if (spotCenter && shipIntersectsSpot(s.mesh.position, s.radius, spotCenter, spotRange)) {
+      if (spotCenter && shipIntersectsSpot(s.mesh.position, s.xzRadius, spotCenter, spotRange)) {
         // desired heading = ship -> spotlight center (XZ only)
         tmpDesired.subVectors(spotCenter, s.mesh.position);
         tmpDesired.y = 0;
@@ -270,10 +306,29 @@ export function createShipSystem(
       tmpLook.copy(s.mesh.position).add(s.direction);
       s.mesh.lookAt(tmpLook);
 
+      s.mesh.updateMatrixWorld(true);
+      s.worldBox.copy(s.localBox).applyMatrix4(s.mesh.matrixWorld);
+
       // arrival
       if (s.mesh.position.z <= shipArriveZ) {
-        s.active = false;
-        s.mesh.visible = false;
+        deactivateShip(scene, s);
+      }
+    }
+
+    // --- Ship-ship collisions ---
+    for (let i = 0; i < ships.length; i++) {
+      const a = ships[i];
+      if (!a.active) continue;
+
+      for (let j = i + 1; j < ships.length; j++) {
+        const b = ships[j];
+        if (!b.active) continue;
+
+        if (a.worldBox.intersectsBox(b.worldBox)) {
+          deactivateShip(scene, a);
+          deactivateShip(scene, b);
+          break; // a is gone, stop checking it
+        }
       }
     }
   }
@@ -283,6 +338,7 @@ export function createShipSystem(
     ships.length = 0;
     shipsSpawned = 0;
     spawnTimer = shipSpawnInterval;
+    laneQueue = buildLaneQueue(shipLanes);
   }
 
   return { ships, spawnShip, update, reset };

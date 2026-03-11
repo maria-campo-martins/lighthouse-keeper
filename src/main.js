@@ -223,7 +223,7 @@ function animate() {
       sky.update(camera, tPlay);
       beam.setOpacityForProgress(prog);
       beam.update();
-      const spot = beam.getSpotCenterOnPlane(CONFIG.shipY ?? CONFIG.shipY);
+      const spot = beam.getSpotCenterOnPlane(CONFIG.shipY);
       shipSystem.update(dt, tPlay, spot);
       playEnv.update(tPlay);
       const hits = rockSystem.checkShipCollisions(shipSystem.ships);
