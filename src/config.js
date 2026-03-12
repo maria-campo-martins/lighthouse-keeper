@@ -23,7 +23,7 @@ export const CONFIG = {
   fogFar: 2000,
 
   // Dawn
-  skyColorDawn: 0x87ceeb,
+  skyColorDawn: 0xf44336,
   oceanColorDawn: 0x0d4d87,
   fogColorDawn: 0x87ceeb,
 

@@ -193,7 +193,7 @@ export function createShipSystem(
     shipSpawnZ = 550,
     shipArriveZ = 30,
 
-    shipLanes = [-100, -60, -20, 20, 60, 100],
+    shipLanes = [-250, -150, -50, 50, 150, 250],
 
     shipY = 0.6,
     shipSpeedMin = 30,

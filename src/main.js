@@ -190,14 +190,14 @@ function animate() {
       introEnv.updateSunset(introProgress);
       sky.setDawn(1.0 - introProgress);
       sky.setBrightness(1.6);
-      sky.update(camera, time);
+      sky.update(camera, null, time);
 
       if (finished) {
         mode = MODE.PLAY;
 
         introEnv.setActive(false);
         playEnv.setActive(true);
-
+        
         camera.position.set(0, CONFIG.cameraPosY, CONFIG.cameraPosZ);
         camera.lookAt(0, 0, CONFIG.cameraLookZ);
 
@@ -220,7 +220,7 @@ function animate() {
       playEnv.applyDawn(prog);   
       sky.setDawn(prog);
       sky.setBrightness(1.4);
-      sky.update(camera, tPlay);
+      sky.update(camera, null, tPlay);
       beam.setOpacityForProgress(prog);
       beam.update();
       const spot = beam.getSpotCenterOnPlane(CONFIG.shipY);
