@@ -403,6 +403,58 @@ export function createIntroEnvironment(scene, renderer, CONFIG) {
     }
   });
 
+    // --- Intro horizon curtain (masks funky ocean/texture horizon line) ---
+  const introHorizonSkyColor = new THREE.Color(0xb0bfd9);
+  const introHorizonUniforms = {
+    uDawn: { value: 0 },
+    uSkyStart: { value: introHorizonSkyColor },
+    uSkyEnd: { value: bgSunsetEnd.clone() },
+    uAlphaTop: { value: 0.0 },
+    uAlphaBottom: { value: 1.0 },
+  };
+  const introHorizonMat = new THREE.ShaderMaterial({
+    uniforms: introHorizonUniforms,
+    transparent: true,
+    depthWrite: false,
+    depthTest: true,
+    side: THREE.DoubleSide,
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      precision mediump float;
+      uniform float uDawn;
+      uniform vec3 uSkyStart;
+      uniform vec3 uSkyEnd;
+      uniform float uAlphaTop;
+      uniform float uAlphaBottom;
+      varying vec2 vUv;
+
+      void main() {
+        vec3 skyCol = uSkyStart;
+
+        float t = smoothstep(0.0, 1.0, vUv.y);
+        float a = mix(uAlphaBottom, uAlphaTop, pow(t, 8.0));
+
+        gl_FragColor = vec4(skyCol, a);
+      }
+    `,
+  });
+
+  const introCurtainHeight = 250;
+  const introCurtain = new THREE.Mesh(
+    new THREE.PlaneGeometry(6000, introCurtainHeight, 1, 1),
+    introHorizonMat
+  );
+  introCurtain.position.set(0, introCurtainHeight / 2, -800);
+  introCurtain.name = "IntroHorizonCurtain";
+  introCurtain.renderOrder = -50;
+  root.add(introCurtain);
+
   function setActive(active) {
     root.visible = active;
     if (active) {

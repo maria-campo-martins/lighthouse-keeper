@@ -165,12 +165,13 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
         vec3 oceanCol = mix(uOceanNight, uOceanDawn, uDawn);
 
         // Strongest at the horizon (bottom), fades out as it goes upward.
-        float a = mix(uAlphaBottom, uAlphaTop, smoothstep(0.0, 1.0, vUv.y));
+        float t = smoothstep(0.0, 1.0, vUv.y);
+        float a = mix(uAlphaBottom, uAlphaTop, pow(t, 4.0));
         gl_FragColor = vec4(oceanCol, a);
       }
     `,
   });
-
+  
   const curtainHeight = 160;
   const curtainRadius = (CONFIG.oceanSize * 0.5) - 10;
   const horizonCurtain = new THREE.Mesh(
@@ -215,6 +216,7 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
       if (!skyUniforms.uTex.value && scene.environment && scene.environment.isTexture) {
         skyUniforms.uTex.value = scene.environment;
       }
+      scene.background = null;
     }
   }
 
