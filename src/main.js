@@ -403,6 +403,7 @@ function animate() {
         introStartTime = time;
       }
       const finished = intro.update(time);
+      camera.updateMatrixWorld(true);
 
       const introProgress = Math.min(1.0, (time - introStartTime) / 6.0);
       introEnv.updateSunset(introProgress, time);
@@ -487,8 +488,8 @@ function animate() {
       camera.rotation.x = currentPitch;
     }
 
-    renderer.render(scene, camera);
     requestAnimationFrame(animate);
+    renderer.render(scene, camera);
   } catch (err) {
     console.error("Animation loop crashed:", err);
   }
