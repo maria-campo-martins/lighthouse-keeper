@@ -4,9 +4,9 @@ export const CONFIG = {
   cameraFov: 60,
   cameraNear: 0.1,
   cameraFar: 2000,
-  cameraPosY: 80,
+  cameraPosY: 90,
   cameraPosZ: 120,
-  cameraLookZ: 300,
+  cameraLookZ: 500,
 
   // Ocean plane (world space: horizon in front of the keeper)
   oceanSize: 1200,
@@ -16,16 +16,20 @@ export const CONFIG = {
   ambientIntensity: 0.35,      // was 0.15
   ambientColor: 0x2a2f44,      // was 0x1a1a2e
 
-  skyColorNight:   0x0b1633,   // was 0x0a1428
-  oceanColorNight: 0x0b2a4a,   // was 0x030a17  (big lift)
-  fogColorNight: 0x070b18,   // was 0x080c18
+  skyColorNight:   0x75a4d5,   // was 0x0a1428
+  oceanColorNight: 0x75a4d5,//0x0a4787,// 0x0b2a4a,   // was 0x030a17  (big lift)
+  fogColorNight: 0x75a4d5,   // was 0x080c18
   fogNear: 700,
   fogFar: 2000,
 
   // Dawn
-  skyColorDawn: 0xf44336,
-  oceanColorDawn: 0x0d4d87,
-  fogColorDawn: 0x87ceeb,
+  skyColorDawn: 0x75a4d5, //0xf44336,
+  oceanColorDawn: 0x75a4d5,// 0x0d4d87,
+  fogColorDawn: 0x75a4d5,
+
+  // Intro-only ocean colors (distinct from play section)
+  introOceanColorDawn: 0x0b2740,
+  introOceanColorNight: 0x0b2740,
 
   // Lighthouse beam
   beamLength: 800,
@@ -35,7 +39,7 @@ export const CONFIG = {
   beamOpacity: 0.35,
   beamRotationSpeed: 0.02,
   beamInitialYaw: 3.11,      // Initial horizontal rotation (left/right) in radians
-  beamInitialPitch: -0.24,    // Initial vertical rotation (up/down) in radians
+  beamInitialPitch: -0.06,    // Initial vertical rotation (up/down) in radians
   lampOffsetX: 0,
   lampOffsetY: -2,
   lampOffsetZ: -2.0,
@@ -55,4 +59,4 @@ export const CONFIG = {
   shipY: 0.6,
 };
 
-export const MODE = { INTRO: "INTRO", PLAY: "PLAY" };
+export const MODE = { INTRO: "INTRO", PLAY: "PLAY", END_GAME: "END_GAME" };

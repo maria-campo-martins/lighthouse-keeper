@@ -201,6 +201,7 @@ export function createShipSystem(
     shipSpawnInterval = 2.0,
     shipTurnRate = 2.5,
     spotRange = 90,
+    onShipWreck = null,
   } = {}
 ) {
   const ships = [];
@@ -327,6 +328,12 @@ export function createShipSystem(
         if (a.worldBox.intersectsBox(b.worldBox)) {
           deactivateShip(scene, a);
           deactivateShip(scene, b);
+
+          if (onShipWreck) {
+            onShipWreck(a);
+            onShipWreck(b);
+          }
+
           break; // a is gone, stop checking it
         }
       }

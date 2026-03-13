@@ -333,14 +333,28 @@ export function createIntroEnvironment(scene, renderer, CONFIG) {
 
 
   // --- Distant ocean behind cliff (blue colors)
-  // Ocean color transitions from dawn to night during intro
-  const oceanColorStart = new THREE.Color(CONFIG.oceanColorDawn);
-  const oceanColorEnd = new THREE.Color(CONFIG.oceanColorNight);
+  // Ocean color transitions from dawn to night during intro.
+  // Use intro-specific ocean colors so this scene can differ from play.
+  const oceanColorStart = new THREE.Color(
+    CONFIG.introOceanColorDawn ?? CONFIG.oceanColorDawn
+  );
+  const oceanColorEnd = new THREE.Color(
+    CONFIG.introOceanColorNight ?? CONFIG.oceanColorNight
+  );
+
+  // Static ocean texture for intro scene
+  const oceanTexture = new THREE.TextureLoader().load("/textures/static_ocean.png");
+  oceanTexture.colorSpace = THREE.SRGBColorSpace;
+  oceanTexture.wrapS = THREE.RepeatWrapping;
+  oceanTexture.wrapT = THREE.RepeatWrapping;
+  oceanTexture.repeat.set(4, 4);
+  oceanTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
   
-  const oceanMat = new THREE.MeshStandardMaterial({ 
-    color: oceanColorStart.clone(), 
-    roughness: 0.25, 
-    metalness: 0.05 
+  const oceanMat = new THREE.MeshStandardMaterial({
+    color: oceanColorStart.clone(),
+    map: oceanTexture,
+    roughness: 0.25,
+    metalness: 0.05,
   });
   const ocean = new THREE.Mesh(
     new THREE.PlaneGeometry(2400, 2400, 1, 1),
@@ -392,7 +406,7 @@ export function createIntroEnvironment(scene, renderer, CONFIG) {
   function setActive(active) {
     root.visible = active;
     if (active) {
-      scene.background = null;
+      // sscene.background = null;
       scene.fog = fogSunset;
       fogSunset.color.copy(fogColorStart);
       ambient.color.copy(ambientColorStart);

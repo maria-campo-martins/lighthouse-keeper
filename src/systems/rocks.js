@@ -174,6 +174,9 @@ export function createRockSystem(
 
     // Visual tuning
     enableWetness = true,
+
+    // Optional callback when a ship collides with any rock
+    onShipWreck = null,
   } = {}
 ) {
   const rocks = [];
@@ -255,6 +258,10 @@ export function createRockSystem(
 
           if (markCrashed) ship.crashed = true;
           if (hideOnCrash) ship.mesh.visible = false;
+
+          if (onShipWreck) {
+            onShipWreck(ship);
+          }
 
           break;
         }
