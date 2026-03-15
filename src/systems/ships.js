@@ -22,7 +22,7 @@ function deactivateShip(scene, ship) {
   if (!ship.active) return;
   ship.active = false;
   ship.mesh.visible = false;
-  scene.remove(ship.mesh); // optional, but cleaner than just hiding
+  scene.remove(ship.mesh);
 }
 
 function getShipXZRadiusFromBox(localBox) {
@@ -153,7 +153,6 @@ function makeShipMesh() {
     ship.add(right);
   }
 
-  // Make shadows possible if your renderer/lights are set up
   ship.traverse((o) => {
     if (o.isMesh) {
       o.castShadow = true;
@@ -348,5 +347,5 @@ export function createShipSystem(
     laneQueue = buildLaneQueue(shipLanes);
   }
 
-  return { ships, spawnShip, update, reset };
+  return { ships, update, reset };
 }

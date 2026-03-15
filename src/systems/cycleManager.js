@@ -15,5 +15,5 @@ export function createCycleManager(CONFIG, onCycleStart) {
     return progress(time);
   }
 
-  return { update, progress };
+  return { update };
 }

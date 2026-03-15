@@ -8,7 +8,6 @@ import { createIntroCamera } from "./systems/introCamera.js";
 import { createCycleManager } from "./systems/cycleManager.js";
 import { createShipSystem } from "./systems/ships.js";
 import { createRockSystem } from "./systems/rocks.js";
-//import { createSkyDome } from "./systems/sky.js";
 import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 
 // --- Simple UI overlay (countdown + game over) ---
@@ -258,10 +257,6 @@ rgbeLoader.load("cloudy_sky_image.hdr", (texture) => {
 // Environments
 const introEnv = createIntroEnvironment(scene, renderer, CONFIG);
 const playEnv = createPlayEnvironment(scene, renderer, CONFIG);
-//const sky = createSkyDome(scene, renderer, CONFIG);
-//sky.setColors({ dawn: 0x4a90e2, night: CONFIG.skyColorNight });
-//sky.setActive(true);
-//sky.setBrightness(1.4); // crank if too dark under ACES
 
 introEnv.setActive(true);
 playEnv.setActive(false);
@@ -326,7 +321,6 @@ function startPlay(timeNow) {
     shipCount: CONFIG.cycleShipCount,
     shipSpawnZ: CONFIG.shipSpawnZ,
     shipArriveZ: CONFIG.shipArriveZ,
-    shipLaneX: CONFIG.shipLaneX,
     shipSpawnXMin: CONFIG.shipSpawnXMin,
     shipSpawnXMax: CONFIG.shipSpawnXMax,
     shipY: CONFIG.shipY,
@@ -407,9 +401,6 @@ function animate() {
 
       const introProgress = Math.min(1.0, (time - introStartTime) / 6.0);
       introEnv.updateSunset(introProgress, time);
-     // sky.setDawn(1.0 - introProgress);
-     // sky.setBrightness(1.6);
-     // sky.update(camera, null, time);
 
       if (finished) {
         mode = MODE.PLAY;
@@ -437,18 +428,13 @@ function animate() {
 
       const prog = cycle.update(tPlay);
       playEnv.applyDawn(prog);   
-     // sky.setDawn(prog);
-     // sky.setBrightness(1.4);
-     // sky.update(camera, null, tPlay);
+
       beam.setOpacityForProgress(prog);
       beam.update();
       const spot = beam.getSpotCenterOnPlane(CONFIG.shipY);
       shipSystem.update(dt, tPlay, spot);
       playEnv.update(tPlay, camera);
-      const hits = rockSystem.checkShipCollisions(shipSystem.ships);
-      if (hits.length) {
-        // ...
-      }
+      rockSystem.checkShipCollisions(shipSystem.ships);
 
       // Countdown timer and transition to END_GAME
       if (countdownEndTime != null) {

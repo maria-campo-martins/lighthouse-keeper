@@ -562,7 +562,6 @@ export function createIntroEnvironment(scene, renderer, CONFIG) {
     root,
     setActive,
     updateSunset,
-    lighthouse, 
-    plateauTopY
+    lighthouse,
   };
 }

@@ -7,13 +7,12 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
   const _coneDir = new THREE.Vector3();
   const _zAxis = new THREE.Vector3(0, 0, 1);
   const _tmpQuat = new THREE.Quaternion();
-  // Add these temps near the top of createLighthouseBeam
+
     const _spotCenter = new THREE.Vector3();
 
     function getSpotCenterOnPlane(planeY = 0.6) {
       if (!isBeamActive()) return null;
-      
-    // Tip and dir in world (you already compute these in getCone)
+    
     beamGroup.getWorldPosition(_coneOrigin);
 
     beamGroup.getWorldQuaternion(_tmpQuat);
@@ -25,7 +24,6 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
     const t = (planeY - _coneOrigin.y) / dy;
     if (t <= 0) return null; // intersection behind the lamp
 
-    // optional: require it to be within beam length
     if (t > CONFIG.beamLength) return null;
 
     _spotCenter.copy(_coneOrigin).addScaledVector(_coneDir, t);
@@ -58,7 +56,7 @@ export function createLighthouseBeam(scene, camera, CONFIG) {
 
   const beamMesh = new THREE.Mesh(beamGeometry, beamMaterial);
 
-  // Rotate cone 90° around X-axis so it points forward (+Z in group space)
+  // Rotate cone 90 around X-axis so it points forward (+Z in group space)
   beamMesh.rotation.x = -Math.PI / 2;
 
   // Tip at group origin; base at z=beamLength
@@ -164,28 +162,9 @@ function onKeyUp(e) {
     beamGroup.rotation.x = beamRotation.pitch;
   }
 
-  // OLD behavior: use visual cone geometry half-angle
-  function getCone() {
-    if (!isBeamActive()) return null;
-
-    beamGroup.getWorldPosition(_coneOrigin);
-
-    beamGroup.getWorldQuaternion(_tmpQuat);
-    _coneDir.copy(_zAxis).applyQuaternion(_tmpQuat).normalize();
-
-    const angle = Math.atan(CONFIG.beamRadius / CONFIG.beamLength);
-
-    return {
-      origin: _coneOrigin.clone(),
-      dir: _coneDir.clone(),
-      angle,
-      length: CONFIG.beamLength,
-    };
-  }
-
   function isBeamActive() {
     return enabled && !beamHiddenBySpace;
   }
 
-  return { update, setEnabled, setOpacityForProgress, resetAim, getCone, getSpotCenterOnPlane, isBeamActive };
+  return { update, setEnabled, setOpacityForProgress, resetAim, getSpotCenterOnPlane };
 }

@@ -118,13 +118,6 @@ export function createLighthouse(renderer, CONFIG = {}) {
     return p;
   }
 
-  // Exact lantern position in world space
-  function getLanternWorldPosition() {
-    const lanternWorld = new THREE.Vector3();
-    lantern.getWorldPosition(lanternWorld);
-    return lanternWorld;
-  }
-
   // Top of lighthouse (roof tip) position in world space
   function getTopPosition() {
     const topPos = new THREE.Vector3();
@@ -137,7 +130,6 @@ export function createLighthouse(renderer, CONFIG = {}) {
   return {
     group,
     getAimPoint,
-    getLanternWorldPosition,
     getTopPosition,
   };
 }

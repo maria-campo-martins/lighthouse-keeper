@@ -87,9 +87,9 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
 
   const normalTex = loader.load(
     "/textures/water_normal.jpg",
-    () => console.log("✅ normal loaded"),
+    () => console.log("normal loaded"),
     undefined,
-    (e) => console.error("❌ normal failed", e)
+    (e) => console.error("normal failed", e)
   );  
   normalTex.wrapS = normalTex.wrapT = THREE.RepeatWrapping;
   normalTex.repeat.set(20, 20);
@@ -98,9 +98,9 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
 
   const foamTex = loader.load(
     "/textures/foam_noise.png",
-    () => console.log("✅ foam loaded"),
+    () => console.log("foam loaded"),
     undefined,
-    (e) => console.error("❌ foam failed", e)
+    (e) => console.error("foam failed", e)
   );
   foamTex.wrapS = foamTex.wrapT = THREE.RepeatWrapping;
   foamTex.repeat.set(6, 6);
@@ -108,10 +108,7 @@ export function createPlayEnvironment(scene, renderer, CONFIG) {
   foamTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
   // --- scene colors ---
-  const _sky = new THREE.Color();
   const _fog = new THREE.Color();
-
-  const bgNight = new THREE.Color(CONFIG.skyColorNight);
 
   // --- ocean mesh ---
   const oceanGeo = new THREE.PlaneGeometry(

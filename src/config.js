@@ -13,18 +13,18 @@ export const CONFIG = {
   oceanSegments: 32,
 
   // Night atmosphere — visible dark blues so horizon is clear from the start
-  ambientIntensity: 0.35,      // was 0.15
-  ambientColor: 0x2a2f44,      // was 0x1a1a2e
+  ambientIntensity: 0.35,
+  ambientColor: 0x2a2f44,
 
-  skyColorNight:   0x75a4d5,   // was 0x0a1428
-  oceanColorNight: 0x75a4d5,//0x0a4787,// 0x0b2a4a,   // was 0x030a17  (big lift)
-  fogColorNight: 0x75a4d5,   // was 0x080c18
+  skyColorNight:   0x75a4d5,
+  oceanColorNight: 0x75a4d5,
+  fogColorNight: 0x75a4d5,
   fogNear: 700,
   fogFar: 2000,
 
   // Dawn
-  skyColorDawn: 0x75a4d5, //0xf44336,
-  oceanColorDawn: 0x75a4d5,// 0x0d4d87,
+  skyColorDawn: 0x75a4d5,
+  oceanColorDawn: 0x75a4d5,
   fogColorDawn: 0x75a4d5,
 
   // Intro-only ocean colors (distinct from play section)
@@ -53,7 +53,6 @@ export const CONFIG = {
   // Ship path (used to compute deterministic speed)
   shipSpawnZ: 550,
   shipArriveZ: 30,
-  shipLaneX: [-80, 0, 80], // Deprecated - kept for compatibility
   shipSpawnXMin: -120,
   shipSpawnXMax: 120,
   shipY: 0.6,

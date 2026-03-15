@@ -95,7 +95,7 @@ function makeRockMesh({
   // Slightly higher detail than 0 gives better shading with little cost
   const geo = new THREE.IcosahedronGeometry(radius, 1);
 
-  // Vertex noise: breaks perfect symmetry (cheap realism)
+  // Vertex noise: breaks perfect symmetry
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i);

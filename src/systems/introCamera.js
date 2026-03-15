@@ -27,8 +27,6 @@ export function createIntroCamera(camera, opts) {
   const tmpLook = new THREE.Vector3();
   let startTime = null;
 
-  function reset(now) { startTime = now; }
-
   function update(now) {
     if (startTime === null) startTime = now;
 
@@ -50,5 +48,5 @@ export function createIntroCamera(camera, opts) {
     return t >= 1;
   }
 
-  return { update, reset };
+  return { update };
 }
